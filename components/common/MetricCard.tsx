@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactElement } from 'react';
 
 interface MetricCardProps {
   label: string;
@@ -7,7 +7,7 @@ interface MetricCardProps {
   trend?: 'up' | 'down' | 'flat';
 }
 
-const trendIcons: Record<NonNullable<MetricCardProps['trend']>, JSX.Element> = {
+const trendIcons: Record<NonNullable<MetricCardProps['trend']>, ReactElement> = {
   up: (
     <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 4.5 4.5 3-3M4.5 8.25h6" />

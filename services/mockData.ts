@@ -14,6 +14,7 @@ import type {
 const today = new Date();
 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 const addDays = (days: number) => formatDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
+const addDaysISO = (days: number) => new Date(today.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
 export const initialLeads: Lead[] = [
   {
@@ -159,8 +160,9 @@ const santosStages: ProjectStage[] = [
     name: 'Design',
     status: 'completed',
     ownerRole: 'Designer',
-    startedAt: addDays(-5),
-    completedAt: addDays(-2),
+    startedAt: addDaysISO(-5),
+    completedAt: addDaysISO(-2),
+    dueAt: addDaysISO(-3),
     slaHours: 48,
   },
   {
@@ -168,8 +170,8 @@ const santosStages: ProjectStage[] = [
     name: 'Production',
     status: 'in_progress',
     ownerRole: 'Production',
-    startedAt: addDays(-2),
-    dueAt: addDays(3),
+    startedAt: addDaysISO(-2),
+    dueAt: addDaysISO(3),
     slaHours: 72,
   },
   {
@@ -206,7 +208,7 @@ export const initialTasks: Task[] = [
     assignee: 'Jon (Production)',
     role: 'Production',
     status: 'In Progress',
-    dueAt: addDays(2),
+    dueAt: addDaysISO(2),
     estimatedHours: 12,
     actualHours: 6,
   },
@@ -218,7 +220,7 @@ export const initialTasks: Task[] = [
     assignee: 'Mae (Production)',
     role: 'Production',
     status: 'Not Started',
-    dueAt: addDays(1),
+    dueAt: addDaysISO(1),
     estimatedHours: 10,
     actualHours: 0,
   },
