@@ -1,34 +1,49 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Header from './components/Header';
-import Footer from './components/Footer';
-import HomePage from './components/HomePage';
-import PhotoRestorationPage from './components/PhotoRestorationPage';
-import ServicesPage from './components/ServicesPage';
-import GalleryPage from './components/GalleryPage';
-import QuotePage from './components/QuotePage';
-import TarpGeneratorPage from './components/TarpGeneratorPage'; // Import the new page
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import Sidebar from './components/layout/Sidebar';
+import TopBar from './components/layout/TopBar';
+import MobileNav from './components/layout/MobileNav';
+import DashboardPage from './components/pages/DashboardPage';
+import LeadsPage from './components/pages/LeadsPage';
+import QuotesPage from './components/pages/QuotesPage';
+import OrdersPage from './components/pages/OrdersPage';
+import ProjectsPage from './components/pages/ProjectsPage';
+import TasksPage from './components/pages/TasksPage';
+import ApprovalsPage from './components/pages/ApprovalsPage';
+import InvoicesPage from './components/pages/InvoicesPage';
+import ReportsPage from './components/pages/ReportsPage';
+import PortalPage from './components/pages/PortalPage';
+import { DataProvider } from './context/DataContext';
 
-const App: React.FC = () => {
-  return (
-    <HashRouter>
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/ai-lab/photo-restoration" element={<PhotoRestorationPage />} />
-            <Route path="/ai-lab/tarp-generator" element={<TarpGeneratorPage />} /> {/* Add the new route */}
-            <Route path="/services" element={<ServicesPage />} />
-            <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="/quote" element={<QuotePage />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-        <Footer />
+const App: React.FC = () => (
+  <HashRouter>
+    <DataProvider>
+      <div className="min-h-screen bg-slate-50">
+        <div className="flex">
+          <Sidebar />
+          <div className="flex flex-1 flex-col">
+            <MobileNav />
+            <TopBar />
+            <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/sales/leads" element={<LeadsPage />} />
+                <Route path="/sales/quotes" element={<QuotesPage />} />
+                <Route path="/delivery/orders" element={<OrdersPage />} />
+                <Route path="/delivery/projects" element={<ProjectsPage />} />
+                <Route path="/delivery/tasks" element={<TasksPage />} />
+                <Route path="/ops/approvals" element={<ApprovalsPage />} />
+                <Route path="/finance/invoices" element={<InvoicesPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/portal" element={<PortalPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+          </div>
+        </div>
       </div>
-    </HashRouter>
-  );
-};
+    </DataProvider>
+  </HashRouter>
+);
 
 export default App;
