@@ -1,0 +1,5 @@
+{
+  "name": "JAX Printing Shop AI Lab",
+  "description": "An AI-powered photo restoration tool from JAX Printing Shop in Dumaguete. Upload old photos to restore, colorize, and upscale them, then request high-quality prints.",
+  "requestFramePermissions": []
+}
