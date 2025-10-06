@@ -61,14 +61,31 @@ const cloneStageTemplate = () =>
 
 const assignTasksFromTemplate = (projectId: string, stages: ProjectStage[]): Task[] => {
   const stageIdMap = new Map(stages.map(stage => [stage.templateId ?? stage.name, stage.id]));
-  return initialTasksCatalog.map(task => ({
-    ...task,
-    id: generateId('task'),
-    projectId,
-    stageId: stageIdMap.get(task.stageId) ?? stages[0].id,
-    status: 'Not Started',
-    actualHours: 0,
-  }));
+  return initialTasksCatalog.map(task => {
+    const resolvedStageId = stageIdMap.get(task.stageId) ?? stages[0].id;
+    const targetStage = stages.find(stage => stage.id === resolvedStageId);
+    return {
+      ...task,
+      id: generateId('task'),
+      projectId,
+      stageId: resolvedStageId,
+      status: 'Not Started',
+      actualHours: 0,
+      dueAt: targetStage?.dueAt,
+    };
+  });
+};
+
+const getNow = () => {
+  const now = new Date();
+  const iso = now.toISOString();
+  return { iso, dateOnly: iso.split('T')[0] };
+};
+
+const calculateDueAtFromSLA = (start: string | undefined, slaHours: number) => {
+  const baseline = start ? new Date(start) : new Date();
+  baseline.setHours(baseline.getHours() + slaHours);
+  return baseline.toISOString();
 };
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -105,28 +122,58 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProjectStage = (projectId: string, stageId: string, status: ProjectStage['status']) => {
-    const timestamp = new Date().toISOString().split('T')[0];
+    const { iso, dateOnly } = getNow();
     setProjects(prev =>
       prev.map(project => {
         if (project.id !== projectId) return project;
+
         const stages = project.stages.map(stage => {
           if (stage.id !== stageId) return stage;
-          return {
-            ...stage,
-            status,
-            startedAt: stage.startedAt ?? timestamp,
-            completedAt: status === 'completed' ? timestamp : stage.completedAt,
-          };
+
+          const nextStage: ProjectStage = { ...stage, status };
+
+          if (!nextStage.startedAt && status !== 'pending') {
+            nextStage.startedAt = iso;
+          }
+
+          if (!nextStage.dueAt && status !== 'pending') {
+            nextStage.dueAt = calculateDueAtFromSLA(nextStage.startedAt ?? iso, nextStage.slaHours);
+          }
+
+          if (status === 'completed') {
+            nextStage.completedAt = iso;
+          }
+
+          if (status === 'blocked' && !nextStage.startedAt) {
+            nextStage.startedAt = iso;
+          }
+
+          return nextStage;
         });
-        const nextStatus = stages.some(stage => stage.status === 'in_progress')
-          ? 'production'
-          : stages.every(stage => stage.status === 'completed')
-          ? 'ready'
-          : project.status;
+
+        let nextStatus: Project['status'] = project.status;
+        if (stages.every(stage => stage.status === 'completed')) {
+          nextStatus = 'ready';
+        } else {
+          const activeStage = stages.find(stage => stage.status === 'in_progress');
+          if (activeStage) {
+            if (activeStage.ownerRole === 'Designer') {
+              nextStatus = 'design';
+            } else if (activeStage.ownerRole === 'Production') {
+              nextStatus = 'production';
+            } else if (activeStage.ownerRole === 'QC') {
+              nextStatus = 'qc';
+            } else {
+              nextStatus = 'production';
+            }
+          }
+        }
+
         return {
           ...project,
           stages,
           status: nextStatus,
+          startDate: project.startDate ?? dateOnly,
         };
       }),
     );
@@ -137,7 +184,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const recordApprovalDecision = (approvalId: string, status: Approval['status'], notes?: string) => {
-    const timestamp = new Date().toISOString().split('T')[0];
+    const { iso, dateOnly } = getNow();
     setApprovals(prev =>
       prev.map(approval =>
         approval.id === approvalId
@@ -161,7 +208,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...project,
                 stages: project.stages.map(stage =>
                   stage.ownerRole === 'Designer' && stage.status !== 'completed'
-                    ? { ...stage, status: 'completed', completedAt: timestamp }
+                    ? {
+                        ...stage,
+                        status: 'completed',
+                        completedAt: iso,
+                        startedAt: stage.startedAt ?? iso,
+                        dueAt: stage.dueAt ?? calculateDueAtFromSLA(iso, stage.slaHours),
+                      }
                     : stage,
                 ),
               }
@@ -203,9 +256,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const quote = quotes.find(item => item.id === quoteId);
     if (!quote) return;
 
-    const timestamp = new Date().toISOString().split('T')[0];
+    const { iso, dateOnly } = getNow();
     const orderId = generateId('order');
-    const orderNumber = `SO-${timestamp.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`;
+    const orderNumber = `SO-${dateOnly.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`;
 
     const newOrder: Order = {
       id: orderId,
@@ -219,30 +272,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       depositRequired: quote.depositRequired,
       depositReceived: quote.depositReceived,
       totalAmount: quote.totalAmount,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      createdAt: dateOnly,
+      updatedAt: dateOnly,
     };
 
-    const stages = cloneStageTemplate().map(stage => {
+    const stages = cloneStageTemplate().map<ProjectStage>(stage => {
       if (stage.name === 'Design') {
+        const isAccepted = quote.status === 'accepted';
+        const startedAt = iso;
+        const dueAt = calculateDueAtFromSLA(startedAt, stage.slaHours);
         return {
           ...stage,
-          status: quote.status === 'accepted' ? 'completed' : 'in_progress',
-          startedAt: timestamp,
-          completedAt: quote.status === 'accepted' ? timestamp : undefined,
+          status: isAccepted ? 'completed' : 'in_progress',
+          startedAt,
+          completedAt: isAccepted ? iso : undefined,
+          dueAt,
         };
       }
       return stage;
     });
 
+    const initialProjectStatus = stages.some(stage => stage.status === 'in_progress')
+      ? 'design'
+      : stages[0]?.status === 'completed'
+      ? 'production'
+      : 'planning';
+
     const newProject: Project = {
       id: generateId('project'),
-      code: `PR-${timestamp.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`,
+      code: `PR-${dateOnly.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`,
       orderId,
       name: `${quote.customerName} Job`,
       type: quote.items.some(item => item.fulfillmentType === 'install') ? 'Installation' : 'Print',
-      status: 'planning',
-      startDate: timestamp,
+      status: initialProjectStatus,
+      startDate: dateOnly,
       dueDate: quote.items.find(item => item.dueDate)?.dueDate,
       budgetHours: quote.items.length * 20,
       actualHours: 0,
@@ -254,9 +317,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const invoice: Invoice = {
       id: generateId('inv'),
       orderId,
-      number: `INV-${timestamp.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`,
+      number: `INV-${dateOnly.replace(/-/g, '').slice(2)}-${Math.floor(Math.random() * 90 + 10)}`,
       status: quote.depositReceived >= quote.depositRequired ? 'issued' : 'draft',
-      issueDate: timestamp,
+      issueDate: dateOnly,
       dueDate: quote.validUntil,
       totalAmount: quote.totalAmount,
       balanceDue: quote.totalAmount - quote.depositReceived,
@@ -268,7 +331,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 invoiceId: '',
                 amount: quote.depositReceived,
                 method: 'bank_transfer',
-                date: timestamp,
+                date: dateOnly,
               },
             ]
           : [],
@@ -321,7 +384,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 const formatDateWithOffset = (offset: number) => {
   const timestamp = new Date();
   timestamp.setDate(timestamp.getDate() + offset);
-  return timestamp.toISOString().split('T')[0];
+  return timestamp.toISOString();
 };
 
 export const useDataContext = () => {
